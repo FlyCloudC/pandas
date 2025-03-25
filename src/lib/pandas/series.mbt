@@ -477,20 +477,19 @@ pub fn Series::data(self : Series) -> SeriesData {
 fn op_add(self : SeriesData, other : SeriesData) -> SeriesData {
   match (self, other) {
     (SeriesData::Int(a), SeriesData::Int(b)) => {
-      let res = a.copy()
-      res.eachi(fn(i, v) { res[i] = v + b[i] })
+      let res = Array::makei(a.length(), fn(i) { a[i] + b[i] })
       SeriesData::Int(res)
     }
     (SeriesData::Float(a), SeriesData::Float(b)) => {
-      let res = a.copy()
-      res.eachi(fn(i, v) { res[i] = v + b[i] })
+      let res = Array::makei(a.length(), fn(i) { a[i] + b[i] })
       SeriesData::Float(res)
     }
-    (SeriesData::Str(a), SeriesData::Str(b)) => SeriesData::Str(a + b)
-    (SeriesData::Int(a), SeriesData::Float(b))
-    | (SeriesData::Float(b), SeriesData::Int(a)) => {
-      let res = b.copy()
-      res.eachi(fn(i, v) { res[i] = v + a[i].to_float() })
+    (SeriesData::Int(a), SeriesData::Float(b)) => {
+      let res = Array::makei(a.length(), fn(i) { a[i].to_float() + b[i] })
+      SeriesData::Float(res)
+    }
+    (SeriesData::Float(a), SeriesData::Int(b)) => {
+      let res = Array::makei(a.length(), fn(i) { a[i] + b[i].to_float() })
       SeriesData::Float(res)
     }
     _ => abort("unsupported types")
@@ -541,19 +540,19 @@ pub fn Series::op_add(self : Series, other : Series) -> Series {
 fn op_sub(self : SeriesData, other : SeriesData) -> SeriesData {
   match (self, other) {
     (SeriesData::Int(a), SeriesData::Int(b)) => {
-      let res = a.copy()
-      res.eachi(fn(i, v) { res[i] = v - b[i] })
+      let res = Array::makei(a.length(), fn(i) { a[i] - b[i] })
       SeriesData::Int(res)
     }
     (SeriesData::Float(a), SeriesData::Float(b)) => {
-      let res = a.copy()
-      res.eachi(fn(i, v) { res[i] = v - b[i] })
+      let res = Array::makei(a.length(), fn(i) { a[i] - b[i] })
       SeriesData::Float(res)
     }
-    (SeriesData::Int(a), SeriesData::Float(b))
-    | (SeriesData::Float(b), SeriesData::Int(a)) => {
-      let res = b.copy()
-      res.eachi(fn(i, v) { res[i] = v - a[i].to_float() })
+    (SeriesData::Int(a), SeriesData::Float(b)) => {
+      let res = Array::makei(a.length(), fn(i) { a[i].to_float() - b[i] })
+      SeriesData::Float(res)
+    }
+    (SeriesData::Float(a), SeriesData::Int(b)) => {
+      let res = Array::makei(a.length(), fn(i) { a[i] - b[i].to_float() })
       SeriesData::Float(res)
     }
     _ => abort("unsupported types")
@@ -583,19 +582,19 @@ pub fn Series::op_sub(self : Series, other : Series) -> Series {
 fn SeriesData::op_mul(self : SeriesData, other : SeriesData) -> SeriesData {
   match (self, other) {
     (SeriesData::Int(a), SeriesData::Int(b)) => {
-      let res = a.copy()
-      res.eachi(fn(i, v) { res[i] = v * b[i] })
+      let res = Array::makei(a.length(), fn(i) { a[i] * b[i] })
       SeriesData::Int(res)
     }
     (SeriesData::Float(a), SeriesData::Float(b)) => {
-      let res = a.copy()
-      res.eachi(fn(i, v) { res[i] = v * b[i] })
+      let res = Array::makei(a.length(), fn(i) { a[i] * b[i] })
       SeriesData::Float(res)
     }
-    (SeriesData::Int(a), SeriesData::Float(b))
-    | (SeriesData::Float(b), SeriesData::Int(a)) => {
-      let res = b.copy()
-      res.eachi(fn(i, v) { res[i] = v * a[i].to_float() })
+    (SeriesData::Int(a), SeriesData::Float(b)) => {
+      let res = Array::makei(a.length(), fn(i) { a[i].to_float() * b[i] })
+      SeriesData::Float(res)
+    }
+    (SeriesData::Float(a), SeriesData::Int(b)) => {
+      let res = Array::makei(a.length(), fn(i) { a[i] * b[i].to_float() })
       SeriesData::Float(res)
     }
     _ => abort("unsupported types")
@@ -615,19 +614,19 @@ pub fn Series::op_mul(self : Series, other : Series) -> Series {
 fn SeriesData::op_div(self : SeriesData, other : SeriesData) -> SeriesData {
   match (self, other) {
     (SeriesData::Int(a), SeriesData::Int(b)) => {
-      let res = a.copy()
-      res.eachi(fn(i, v) { res[i] = v / b[i] })
+      let res = Array::makei(a.length(), fn(i) { a[i] / b[i] })
       SeriesData::Int(res)
     }
     (SeriesData::Float(a), SeriesData::Float(b)) => {
-      let res = a.copy()
-      res.eachi(fn(i, v) { res[i] = v / b[i] })
+      let res = Array::makei(a.length(), fn(i) { a[i] / b[i] })
       SeriesData::Float(res)
     }
-    (SeriesData::Int(a), SeriesData::Float(b))
-    | (SeriesData::Float(b), SeriesData::Int(a)) => {
-      let res = b.copy()
-      res.eachi(fn(i, v) { res[i] = v / a[i].to_float() })
+    (SeriesData::Int(a), SeriesData::Float(b)) => {
+      let res = Array::makei(a.length(), fn(i) { a[i].to_float() / b[i] })
+      SeriesData::Float(res)
+    }
+    (SeriesData::Float(a), SeriesData::Int(b)) => {
+      let res = Array::makei(a.length(), fn(i) { a[i] / b[i].to_float() })
       SeriesData::Float(res)
     }
     _ => abort("unsupported types")
