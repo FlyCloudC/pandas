@@ -57,58 +57,38 @@ pub impl Hash for Series with hash_combine(self, hasher) {
 /// let series = Series::new("A", SeriesInput::Int32([1, 2, 3]))
 /// ```
 pub fn Series::new(name : String, values : SeriesInput) -> Series {
-  let mut bit_map = emptyBitMap
+  let mut bitmap = emptyBitMap
   let data = match values {
     SeriesInput::Int32(data) => SeriesData::Int(data)
     SeriesInput::Float32(data) => SeriesData::Float(data)
     SeriesInput::Bool(data) => SeriesData::Bool(data)
     SeriesInput::Str(data) => SeriesData::Str(data)
     SeriesInput::Int32_Nullable(data) => {
-      bit_map = BitMap::new(data~)
+      bitmap = BitMap::new(data~)
       SeriesData::Int(
-        Array::makei(data.length(), fn(i) {
-          match data[i] {
-            None => 0
-            Some(x) => x
-          }
-        }),
+        Array::makei(data.length(), fn(i) { data[i].or_default() }),
       )
     }
     SeriesInput::Float32_Nullable(data) => {
-      bit_map = BitMap::new(data~)
+      bitmap = BitMap::new(data~)
       SeriesData::Float(
-        Array::makei(data.length(), fn(i) {
-          match data[i] {
-            None => 0.0
-            Some(x) => x
-          }
-        }),
+        Array::makei(data.length(), fn(i) { data[i].or_default() }),
       )
     }
     SeriesInput::Bool_Nullable(data) => {
-      bit_map = BitMap::new(data~)
+      bitmap = BitMap::new(data~)
       SeriesData::Bool(
-        Array::makei(data.length(), fn(i) {
-          match data[i] {
-            None => false
-            Some(x) => x
-          }
-        }),
+        Array::makei(data.length(), fn(i) { data[i].or_default() }),
       )
     }
     SeriesInput::Str_Nullable(data) => {
-      bit_map = BitMap::new(data~)
+      bitmap = BitMap::new(data~)
       SeriesData::Str(
-        Array::makei(data.length(), fn(i) {
-          match data[i] {
-            None => ""
-            Some(x) => x
-          }
-        }),
+        Array::makei(data.length(), fn(i) { data[i].or_default() }),
       )
     }
   }
-  Series::{ name: name.to_string(), data, bitmap: bit_map }
+  Series::{ name, data, bitmap }
 }
 
 ///| 内部保证无null时使用
@@ -541,10 +521,10 @@ fn emptySeriesData(dtype : DataType) -> SeriesData {
 ///|
 fn SeriesData::create_by_size(n : Int, dtype : DataType) -> SeriesData {
   match dtype {
-    Int32 => SeriesData::Int(Array::make(n, 0))
-    Float32 => SeriesData::Float(Array::make(n, 0.0))
-    Bool => SeriesData::Bool(Array::make(n, false))
-    String => SeriesData::Str(Array::make(n, ""))
+    Int32 => SeriesData::Int(Array::make(n, Int::default()))
+    Float32 => SeriesData::Float(Array::make(n, Float::default()))
+    Bool => SeriesData::Bool(Array::make(n, Bool::default()))
+    String => SeriesData::Str(Array::make(n, String::default()))
   }
 }
 
@@ -932,31 +912,25 @@ pub fn Series::min(self : Series) -> SeriesValue!Error {
 pub fn Series::sum(self : Series) -> SeriesValue!InvalidType {
   match self.data {
     SeriesData::Int(data) =>
-      match data {
-        _ =>
-          SeriesValue::Int(
-            data.foldi(init=0, fn(i, acc, x) {
-              if not(self.bitmap[i]) {
-                acc + x
-              } else {
-                acc
-              }
-            }),
-          )
-      }
+      SeriesValue::Int(
+        data.foldi(init=0, fn(i, acc, x) {
+          if not(self.bitmap[i]) {
+            acc + x
+          } else {
+            acc
+          }
+        }),
+      )
     SeriesData::Float(data) =>
-      match data {
-        _ =>
-          SeriesValue::Float(
-            data.foldi(init=0.0, fn(i, acc, x) {
-              if not(self.bitmap[i]) {
-                acc + x
-              } else {
-                acc
-              }
-            }),
-          )
-      }
+      SeriesValue::Float(
+        data.foldi(init=0.0, fn(i, acc, x) {
+          if not(self.bitmap[i]) {
+            acc + x
+          } else {
+            acc
+          }
+        }),
+      )
     _ => raise InvalidType("unsupported type")
   }
 }
@@ -1151,19 +1125,18 @@ impl Compare for SeriesData with compare(self, other) -> Int {
 /// }
 /// ```
 pub fn Series::all(self : Series) -> Bool!InvalidType {
-  match self.data {
-    SeriesData::Bool(data) =>
-      match self.bitmap.optional {
-        false => data.iter().all(fn(x) { x })
-        true =>
-          data.foldi(init=true, fn(i, acc, x) {
-            match self.bitmap[i] {
-              true => acc && x
-              false => acc
-            }
-          })
-      }
-    _ => raise InvalidType("unsupported type")
+  guard self.data is SeriesData::Bool(data) else {
+    raise InvalidType("unsupported type")
+  }
+  match self.bitmap.optional {
+    false => data.iter().all(fn(x) { x })
+    true =>
+      data.foldi(init=true, fn(i, acc, x) {
+        match self.bitmap[i] {
+          true => acc && x
+          false => acc
+        }
+      })
   }
 }
 
@@ -1197,20 +1170,19 @@ test "Series::all" {
 /// inspect!(series.any!(), content="false")
 /// ```
 pub fn Series::any(self : Series) -> Bool!InvalidType {
-  match self.data {
-    SeriesData::Bool(data) =>
-      // data.iter().any(fn(x) { x })
-      match self.bitmap.optional {
-        false => data.iter().any(fn(x) { x })
-        true =>
-          data.foldi(init=false, fn(i, acc, x) {
-            match self.bitmap[i] {
-              true => acc || x
-              false => acc
-            }
-          })
-      }
-    _ => raise InvalidType("unsupported type")
+  guard self.data is SeriesData::Bool(data) else {
+    raise InvalidType("unsupported type")
+  }
+  // data.iter().any(fn(x) { x })
+  match self.bitmap.optional {
+    false => data.iter().any(fn(x) { x })
+    true =>
+      data.foldi(init=false, fn(i, acc, x) {
+        match self.bitmap[i] {
+          true => acc || x
+          false => acc
+        }
+      })
   }
 }
 
@@ -1240,30 +1212,24 @@ test "Series::any" {
 /// inspect!(series.not_().data, content="Bool([false, true, false])")
 /// ```
 pub fn Series::not_(self : Series) -> Series {
-  match self.data {
-    SeriesData::Bool(data) =>
-      // bitmap will not change
-      // Series::new_by_SeriesData(self.name(), SeriesData::Bool(data.map(fn(x) { not(x) })))
-      match self.bitmap.optional {
-        false =>
-          Series::new_by_SeriesData(
-            self.name(),
-            SeriesData::Bool(data.map(fn(x) { not(x) })),
-          )
-        true =>
-          Series::new_by_SeriesData(
-            self.name(),
-            SeriesData::Bool(
-              data.mapi(fn(i, x) {
-                match self.bitmap[i] {
-                  true => x
-                  false => not(x)
-                }
-              }),
-            ),
-          )
-      }
-    _ => abort("unsupported type")
+  guard self.data is SeriesData::Bool(data) else { abort("unsupported type") }
+  // bitmap will not change
+  // Series::new_by_SeriesData(self.name(), SeriesData::Bool(data.map(not)))
+  match self.bitmap.optional {
+    false =>
+      Series::new_by_SeriesData(self.name(), SeriesData::Bool(data.map(not)))
+    true =>
+      Series::new_by_SeriesData(
+        self.name(),
+        SeriesData::Bool(
+          data.mapi(fn(i, x) {
+            match self.bitmap[i] {
+              true => x
+              false => not(x)
+            }
+          }),
+        ),
+      )
   }
 }
 
@@ -1290,10 +1256,10 @@ pub fn Series::has_null(self : Series) -> Bool {
 ///|
 fn SeriesData::resize(self : SeriesData, new_length : Int) -> Unit {
   match self {
-    SeriesData::Int(data) => data.resize(new_length, 0)
-    SeriesData::Float(data) => data.resize(new_length, 0.0)
-    SeriesData::Bool(data) => data.resize(new_length, false)
-    SeriesData::Str(data) => data.resize(new_length, "")
+    SeriesData::Int(data) => data.resize(new_length, Int::default())
+    SeriesData::Float(data) => data.resize(new_length, Float::default())
+    SeriesData::Bool(data) => data.resize(new_length, Bool::default())
+    SeriesData::Str(data) => data.resize(new_length, String::default())
   }
 }
 
@@ -1342,7 +1308,7 @@ pub fn Series::is_null(self : Series) -> Series {
 /// ```
 pub fn Series::is_not_null(self : Series) -> Series {
   let data = match self.bitmap.optional {
-    true => SeriesData::Bool(self.bitmap.bitmap.map(fn(x) { not(x) }))
+    true => SeriesData::Bool(self.bitmap.bitmap.map(not))
     false => SeriesData::Bool(Array::make(self.length(), true))
   }
   Series::{ name: self.name(), data, bitmap: emptyBitMap }
@@ -1391,8 +1357,7 @@ pub fn Series::is_sorted(
         r -= 1
       }
   }
-  guard not(self.bitmap.optional) ||
-    self.bitmap.bitmap[l:r + 1].all(fn(x) { not(x) }) else {
+  guard not(self.bitmap.optional) || self.bitmap.bitmap[l:r + 1].all(not) else {
     return false
   }
   // check order
@@ -1497,21 +1462,18 @@ pub fn Series::unique_counts(self : Series) -> Series {
   let count : @hashmap.T[SeriesValue, Int] = @hashmap.new()
   let order : Array[SeriesValue] = Array::new()
   for i in 0..<self.length() {
-    if not(count.contains(self.data[i])) {
-      order.push(self.data[i])
+    let x = self.data[i]
+    match count[x] {
+      Some(val) => count[x] = val + 1
+      None => {
+        order.push(x)
+        count[x] = 1
+      }
     }
-    count[self.data[i]] = (match count[self.data[i]] {
-        None => 0
-        Some(val) => val
-      }) +
-      1
   }
-  let data : Array[Int] = Array::makei(order.length(), fn(i) {
-    match count[order[i]] {
-      Some(val) => val
-      // never happened
-      None => -1
-    }
+  let data = order.map(fn(x) {
+    guard count[x] is Some(val) else { abort("unreachable") }
+    val
   })
   Series::new(self.name, SeriesInput::Int32(data))
 }
@@ -1837,10 +1799,8 @@ fn SeriesData::cast_to_int32(
 ) -> SeriesData!InvalidType {
   match self {
     SeriesData::Int(_) => self
-    SeriesData::Float(data) =>
-      SeriesData::Int(data.map(fn(x : Float) { x.to_int() }))
-    SeriesData::Bool(data) =>
-      SeriesData::Int(data.map(fn(x : Bool) { x.to_int() }))
+    SeriesData::Float(data) => SeriesData::Int(data.map(Float::to_int))
+    SeriesData::Bool(data) => SeriesData::Int(data.map(Bool::to_int))
     SeriesData::Str(data) =>
       match strict {
         true => raise InvalidType("Cannot cast String to Int32")
@@ -1855,8 +1815,7 @@ fn SeriesData::cast_to_float32(
   strict~ : Bool = true
 ) -> SeriesData!InvalidType {
   match self {
-    SeriesData::Int(data) =>
-      SeriesData::Float(data.map(fn(x : Int) { x.to_float() }))
+    SeriesData::Int(data) => SeriesData::Float(data.map(Int::to_float))
     SeriesData::Float(_) => self
     SeriesData::Bool(data) =>
       SeriesData::Float(data.map(fn(x : Bool) { x.to_int().to_float() }))
@@ -1883,12 +1842,9 @@ fn SeriesData::cast_to_bool(self : SeriesData) -> SeriesData {
 ///|
 fn SeriesData::cast_to_str(self : SeriesData) -> SeriesData {
   match self {
-    SeriesData::Int(data) =>
-      SeriesData::Str(data.map(fn(x : Int) { x.to_string() }))
-    SeriesData::Float(data) =>
-      SeriesData::Str(data.map(fn(x : Float) { x.to_string() }))
-    SeriesData::Bool(data) =>
-      SeriesData::Str(data.map(fn(x : Bool) { x.to_string() }))
+    SeriesData::Int(data) => SeriesData::Str(data.map(Show::to_string))
+    SeriesData::Float(data) => SeriesData::Str(data.map(Float::to_string))
+    SeriesData::Bool(data) => SeriesData::Str(data.map(Bool::to_string))
     SeriesData::Str(_) => self
   }
 }
@@ -1905,10 +1861,10 @@ fn Series::cast(
     DataType::Bool => self.data.cast_to_bool()
     DataType::String => self.data.cast_to_str()
   }
-  let bitmap = match
-    strict == false &&
-    self.data_type() == DataType::String &&
-    (dtype == DataType::Int32 || dtype == DataType::Float32) {
+  let cast_string_to_number = not(strict) &&
+    self.data_type() is DataType::String &&
+    dtype is (DataType::Int32 | DataType::Float32)
+  let bitmap = match cast_string_to_number {
     true => BitMap::new_by_size(self.length(), value=true)
     false => self.bitmap
   }
