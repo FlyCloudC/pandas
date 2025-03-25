@@ -1439,15 +1439,15 @@ pub fn DataFrame::min_horizontal(self : DataFrame) -> Series! {
       _ => raise InvalidType("Contains unsupported data type")
     }
   }
-  let data = Series::{
-    name: "sum",
-    data: SeriesData::Float(Array::make(self.shape[0], @float.max_value)),
-    bitmap: emptyBitMap,
-  }
+  let acc = Array::make(self.shape[0], @float.max_value)
   for series in self.data {
-    data.data.min(series.data)
+    match series.data {
+      Int(a) => acc.mapi_inplace(fn(i, v) { @math.minimum(a[i].to_float(), v) })
+      Float(a) => acc.mapi_inplace(fn(i, v) { @math.minimum(a[i], v) })
+      _ => panic()
+    }
   }
-  data
+  Series::{ name: "mininum", data: SeriesData::Float(acc), bitmap: emptyBitMap }
 }
 
 ///| Aggregate the columns of this DataFrame to their maximum value
@@ -1535,15 +1535,15 @@ pub fn DataFrame::max_horizontal(self : DataFrame) -> Series! {
       _ => raise InvalidType("Contains unsupported data type")
     }
   }
-  let data = Series::{
-    name: "sum",
-    data: SeriesData::Float(Array::make(self.shape[0], @float.min_value)),
-    bitmap: emptyBitMap,
-  }
+  let acc = Array::make(self.shape[0], @float.min_value)
   for series in self.data {
-    data.data.max(series.data)
+    match series.data {
+      Int(a) => acc.mapi_inplace(fn(i, v) { @math.maximum(a[i].to_float(), v) })
+      Float(a) => acc.mapi_inplace(fn(i, v) { @math.maximum(a[i], v) })
+      _ => panic()
+    }
   }
-  data
+  Series::{ name: "maxinum", data: SeriesData::Float(acc), bitmap: emptyBitMap }
 }
 
 ///| Calculate the sum of each column in the DataFrame
@@ -1613,15 +1613,15 @@ pub fn DataFrame::sum_horizontal(self : DataFrame) -> Series! {
       _ => raise InvalidType("Contains unsupported data type")
     }
   }
-  let mut data = Series::{
-    name: "sum",
-    data: SeriesData::Float(Array::make(self.shape[0], (0.0 : Float))),
-    bitmap: emptyBitMap,
-  }
+  let acc = Array::make(self.shape[0], (0.0 : Float))
   for series in self.data {
-    data += series
+    match series.data {
+      Int(a) => acc.mapi_inplace(fn(i, v) { a[i].to_float() + v })
+      Float(a) => acc.mapi_inplace(fn(i, v) { a[i] + v })
+      _ => panic()
+    }
   }
-  data
+  Series::{ name: "sum", data: SeriesData::Float(acc), bitmap: emptyBitMap }
 }
 
 ///|
