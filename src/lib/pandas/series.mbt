@@ -10,7 +10,6 @@ pub(all) enum SeriesData {
 pub(all) struct Series {
   mut name : String
   mut data : SeriesData
-  mut data_type : DataType
   mut bitmap : BitMap
   mut length : Int
 } derive(Show, Eq)
@@ -113,7 +112,6 @@ pub fn Series::new(name : String, values : SeriesInput) -> Series {
   Series::{
     name: name.to_string(),
     data,
-    data_type: get_dtype(data),
     bitmap: bit_map,
     length: data.length(),
   }
@@ -121,23 +119,7 @@ pub fn Series::new(name : String, values : SeriesInput) -> Series {
 
 ///| 内部保证无null时使用
 fn Series::new_by_SeriesData(name : String, data : SeriesData) -> Series {
-  Series::{
-    name,
-    data,
-    data_type: get_dtype(data),
-    bitmap: emptyBitMap,
-    length: data.length(),
-  }
-}
-
-///|
-fn get_dtype(data : SeriesData) -> DataType {
-  match data {
-    SeriesData::Int(_) => DataType::Int32
-    SeriesData::Float(_) => DataType::Float32
-    SeriesData::Bool(_) => DataType::Bool
-    SeriesData::Str(_) => DataType::String
-  }
+  Series::{ name, data, bitmap: emptyBitMap, length: data.length() }
 }
 
 ///| Get the length of the SeriesData
@@ -185,8 +167,7 @@ fn SeriesData::clear(self : SeriesData) -> Unit {
 pub fn Series::clear(self : Series, n~ : Int = 0) -> Series {
   Series::{
     name: self.name(),
-    data: SeriesData::create_by_size(n, self.data_type),
-    data_type: self.data_type,
+    data: SeriesData::create_by_size(n, self.data_type()),
     bitmap: self.bitmap.clear(n~),
     length: n,
   }
@@ -520,16 +501,6 @@ pub fn Series::data(self : Series) -> SeriesData {
   self.data
 }
 
-///|
-fn SeriesData::get_type(self : SeriesData) -> DataType {
-  match self {
-    SeriesData::Int(_) => DataType::Int32
-    SeriesData::Float(_) => DataType::Float32
-    SeriesData::Bool(_) => DataType::Bool
-    SeriesData::Str(_) => DataType::String
-  }
-}
-
 ///| SeriesData add
 fn op_add(self : SeriesData, other : SeriesData) -> SeriesData {
   match (self, other) {
@@ -590,7 +561,6 @@ pub fn Series::op_add(self : Series, other : Series) -> Series {
   Series::{
     name: self.name(),
     data: self.data() + other.data(),
-    data_type: get_dtype(self.data()),
     bitmap: self.bitmap + other.bitmap,
     length: self.length(),
   }
@@ -634,7 +604,6 @@ pub fn Series::op_sub(self : Series, other : Series) -> Series {
   Series::{
     name: self.name(),
     data: self.data() - other.data(),
-    data_type: get_dtype(self.data()),
     bitmap: self.bitmap + other.bitmap,
     length: self.length(),
   }
@@ -668,7 +637,6 @@ pub fn Series::op_mul(self : Series, other : Series) -> Series {
   Series::{
     name: self.name(),
     data: self.data() * other.data(),
-    data_type: get_dtype(self.data()),
     bitmap: self.bitmap + other.bitmap,
     length: self.length(),
   }
@@ -702,7 +670,6 @@ pub fn Series::op_div(self : Series, other : Series) -> Series {
   Series::{
     name: self.name(),
     data: self.data() / other.data(),
-    data_type: get_dtype(self.data()),
     bitmap: self.bitmap + other.bitmap,
     length: self.length(),
   }
@@ -738,7 +705,7 @@ pub fn merge(
   other : Series,
   inplace~ : Bool = false
 ) -> Series!InvalidType {
-  guard self.data_type == other.data_type else {
+  guard self.data_type() == other.data_type() else {
     raise InvalidType("merger must be the same type")
   }
   let data = match (self.data, other.data) {
@@ -753,7 +720,6 @@ pub fn merge(
       Series::{
         name: self.name(),
         data,
-        data_type: get_dtype(data),
         bitmap: BitMap::merge(self.bitmap, other.bitmap, inplace=false),
         length: self.length() + other.length(),
       }
@@ -791,7 +757,6 @@ pub fn Series::copy(self : Series) -> Series {
   Series::{
     name: self.name(),
     data: self.data.copy(),
-    data_type: self.data_type,
     bitmap: self.bitmap.copy(),
     length: self.length(),
   }
@@ -824,7 +789,7 @@ fn DataType::to_string(self : DataType) -> String {
 }
 
 ///|
-pub fn get_type(self : Series) -> DataType {
+pub fn data_type(self : Series) -> DataType {
   match self.data {
     SeriesData::Int(_) => DataType::Int32
     SeriesData::Float(_) => DataType::Float32
@@ -1372,13 +1337,7 @@ pub fn Series::is_null(self : Series) -> Series {
     true => SeriesData::Bool(self.bitmap.bitmap)
     false => SeriesData::Bool(Array::make(self.length, false))
   }
-  Series::{
-    name: self.name(),
-    data,
-    data_type: DataType::Bool,
-    bitmap: emptyBitMap,
-    length: self.length,
-  }
+  Series::{ name: self.name(), data, bitmap: emptyBitMap, length: self.length }
 }
 
 ///| Returns a boolean Series indicating which values are not null
@@ -1401,13 +1360,7 @@ pub fn Series::is_not_null(self : Series) -> Series {
     true => SeriesData::Bool(self.bitmap.bitmap.map(fn(x) { not(x) }))
     false => SeriesData::Bool(Array::make(self.length, true))
   }
-  Series::{
-    name: self.name(),
-    data,
-    data_type: DataType::Bool,
-    bitmap: emptyBitMap,
-    length: self.length,
-  }
+  Series::{ name: self.name(), data, bitmap: emptyBitMap, length: self.length }
 }
 
 ///| Check if the Series is sorted
@@ -1515,7 +1468,7 @@ pub fn Series::n_unique(self : Series) -> Int {
 
 ///| Return the lower bound of this Series’ dtype as a unit Series.
 pub fn Series::lower_bound(self : Series) -> Series {
-  match self.data.get_type() {
+  match self.data_type() {
     DataType::Int32 =>
       Series::new(self.name, SeriesInput::Int32([@int.min_value]))
     DataType::Float32 =>
@@ -1527,7 +1480,7 @@ pub fn Series::lower_bound(self : Series) -> Series {
 
 ///| Return the upper bound of this Series’ dtype as a unit Series.
 pub fn Series::upper_bound(self : Series) -> Series {
-  match self.data.get_type() {
+  match self.data_type() {
     DataType::Int32 =>
       Series::new(self.name, SeriesInput::Int32([@int.max_value]))
     DataType::Float32 =>
@@ -1611,7 +1564,6 @@ pub fn Series::append(self : Series, other : Series) -> Series!InvalidType {
   Series::{
     name: self.name(),
     data,
-    data_type: get_dtype(data),
     bitmap: self.bitmap.append(other.bitmap),
     length: self.length + other.length,
   }
@@ -1636,7 +1588,7 @@ pub fn Series::append(self : Series, other : Series) -> Series!InvalidType {
 /// inspect!(series1.data, content="Int([1, 2, 3, 4])")
 /// ```
 pub fn Series::extend(self : Series, other : Series) -> Unit!InvalidType {
-  guard self.data.get_type() == other.data.get_type() else {
+  guard self.data_type() == other.data_type() else {
     raise InvalidType("extend must be the same type")
   }
   self.data = self.data.append(other.data)
@@ -1673,12 +1625,12 @@ pub fn Series::concat(data : Array[Series]) -> Series! {
     raise EmptyArrayError("Cannot concatenate an empty array")
   }
   for item in data {
-    guard item.data_type == data[0].data_type else {
+    guard item.data_type() == data[0].data_type() else {
       raise InvalidType("concat must be the same type")
     }
 
   }
-  let mut new_data = emptySeriesData(data[0].data_type)
+  let mut new_data = emptySeriesData(data[0].data_type())
   let mut bitmap = emptyBitMap
   let mut length = 0
   for item in data {
@@ -1686,13 +1638,7 @@ pub fn Series::concat(data : Array[Series]) -> Series! {
     bitmap = bitmap + item.bitmap
     length += item.length
   }
-  Series::{
-    name: data[0].name(),
-    data: new_data,
-    data_type: data[0].data_type,
-    bitmap,
-    length,
-  }
+  Series::{ name: data[0].name(), data: new_data, bitmap, length }
 }
 
 ///| Slice the Series from start to end
@@ -1718,13 +1664,7 @@ pub fn Series::slice(self : Series, start : Int, end : Int) -> Series {
     true => self.bitmap.slice(start, length=end - start)
     false => emptyBitMap
   }
-  Series::{
-    name: self.name(),
-    data,
-    data_type: self.data_type,
-    bitmap,
-    length: end - start,
-  }
+  Series::{ name: self.name(), data, bitmap, length: end - start }
 }
 
 ///| Fill null values in the Series using the specified value or strategy ( call by DataFrame::fill_null )
@@ -1829,7 +1769,6 @@ fn Series::fill_null(
         serie.data = SeriesData::Float(
           Array::makei(serie.length, fn(i) { serie.data[i].to_float() }),
         )
-        serie.data_type = DataType::Float32
         let mean = serie.mean!()
         for i in 0..<serie.length {
           if serie.bitmap[i] {
@@ -1857,7 +1796,7 @@ fn Series::fill_null(
       Some(val) => val
       None => abort("nerver happened")
     }
-    guard type_check_operation(serie.data_type, value.get_type()) else {
+    guard type_check_operation(serie.data_type(), value.get_type()) else {
       raise InvalidType("Value type does not match column type")
     }
     for i in 0..<serie.length {
@@ -1991,18 +1930,12 @@ fn Series::cast(
   }
   let bitmap = match
     strict == false &&
-    self.data_type == DataType::String &&
+    self.data_type() == DataType::String &&
     (dtype == DataType::Int32 || dtype == DataType::Float32) {
     true => BitMap::new_by_size(self.length, value=true)
     false => self.bitmap
   }
-  Series::{
-    name: self.name(),
-    data,
-    data_type: dtype,
-    bitmap,
-    length: self.length,
-  }
+  Series::{ name: self.name(), data, bitmap, length: self.length }
 }
 
 ///|

@@ -464,9 +464,9 @@ test "DataFrame::cast" {
     Series::new("C", SeriesInput::Str(["a", "b", "c"])),
   ])
   let df_cast = df.cast!(data_type=DataType::Float32, strict=false)
-  inspect!(df_cast.data[0].data_type, content="Float32")
+  inspect!(df_cast.data[0].data_type(), content="Float32")
   let df_cast = df.cast!(data_type=DataType::Int32, strict=false)
-  inspect!(df_cast.data[2].data_type, content="Int32")
+  inspect!(df_cast.data[2].data_type(), content="Int32")
   // inspect!(df_cast.data[2].bitmap.length, content="3")
 
   let df = DataFrame::new!([
@@ -478,8 +478,8 @@ test "DataFrame::cast" {
     cast_mapping={ "A": DataType::Float32, "C": DataType::Int32 },
     strict=false,
   )
-  inspect!(df_cast.data[0].data_type, content="Float32")
-  inspect!(df_cast.data[2].data_type, content="Int32")
+  inspect!(df_cast.data[0].data_type(), content="Float32")
+  inspect!(df_cast.data[2].data_type(), content="Int32")
 }
 
 ///|

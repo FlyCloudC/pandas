@@ -374,7 +374,7 @@ pub fn DataFrame::add_row(self : DataFrame, row : Array[SeriesValue]) -> Unit! {
   }
   for i in 0..<row.length() {
     guard row[i] == SeriesValue::Null ||
-      row[i].get_type() == self.data[i].data_type else {
+      row[i].get_type() == self.data[i].data_type() else {
       raise InvalidType("Type mismatch")
     }
 
@@ -490,7 +490,7 @@ pub fn DataFrame::select_rows(
           // select rows
           let selected_rows : Array[Series] = []
           for col in self.data {
-            let mut series_data : SeriesData = emptySeriesData(col.data_type)
+            let mut series_data : SeriesData = emptySeriesData(col.data_type())
             match col.data {
               SeriesData::Int(data) => {
                 let col_data = []
@@ -524,7 +524,6 @@ pub fn DataFrame::select_rows(
             selected_rows.push(Series::{
               name: col.name(),
               data: series_data,
-              data_type: col.data_type,
               bitmap: col.bitmap.select_rows(i),
               length: i.length(),
             })
@@ -545,7 +544,7 @@ pub fn DataFrame::select_rows(
 pub fn op_get(self : DataFrame, index : Int) -> DataFrame {
   let row = []
   for col in self.data {
-    let mut series_data = emptySeriesData(col.data_type)
+    let mut series_data = emptySeriesData(col.data_type())
     match col.data {
       SeriesData::Int(data) => series_data = SeriesData::Int([data[index]])
       SeriesData::Float(data) => series_data = SeriesData::Float([data[index]])
@@ -555,7 +554,6 @@ pub fn op_get(self : DataFrame, index : Int) -> DataFrame {
     row.push(Series::{
       name: col.name,
       data: series_data,
-      data_type: col.data_type,
       bitmap: col.bitmap.slice(index, length=1),
       length: 1,
     })
@@ -1267,7 +1265,7 @@ pub fn DataFrame::transpose(
   column_names? : Array[String]
 ) -> DataFrame! {
   for series in self.data {
-    if series.get_type() != self.data[0].get_type() {
+    if series.data_type() != self.data[0].data_type() {
       raise InvalidType("All columns must have the same data type")
     }
   }
@@ -1396,7 +1394,7 @@ pub fn DataFrame::min(self : DataFrame) -> DataFrame! {
           Series::new_by_SeriesData(series.name, SeriesData::Str([value])),
         )
       SeriesValue::Null =>
-        match series.get_type() {
+        match series.data_type() {
           DataType::Int32 =>
             data.push(
               Series::new(series.name, SeriesInput::Int32_Nullable([None])),
@@ -1439,7 +1437,7 @@ pub fn DataFrame::min(self : DataFrame) -> DataFrame! {
 /// ```
 pub fn DataFrame::min_horizontal(self : DataFrame) -> Series! {
   for series in self.data {
-    match series.get_type() {
+    match series.data_type() {
       DataType::Int32 => ()
       DataType::Float32 => ()
       _ => raise InvalidType("Contains unsupported data type")
@@ -1448,7 +1446,6 @@ pub fn DataFrame::min_horizontal(self : DataFrame) -> Series! {
   let data = Series::{
     name: "sum",
     data: SeriesData::Float(Array::make(self.shape[0], @float.max_value)),
-    data_type: DataType::Float32,
     bitmap: emptyBitMap,
     length: self.shape[0],
   }
@@ -1494,7 +1491,7 @@ pub fn DataFrame::max(self : DataFrame) -> DataFrame! {
           Series::new_by_SeriesData(series.name, SeriesData::Str([value])),
         )
       SeriesValue::Null =>
-        match series.get_type() {
+        match series.data_type() {
           DataType::Int32 =>
             data.push(
               Series::new(series.name, SeriesInput::Int32_Nullable([None])),
@@ -1537,7 +1534,7 @@ pub fn DataFrame::max(self : DataFrame) -> DataFrame! {
 /// ```
 pub fn DataFrame::max_horizontal(self : DataFrame) -> Series! {
   for series in self.data {
-    match series.get_type() {
+    match series.data_type() {
       DataType::Int32 => ()
       DataType::Float32 => ()
       _ => raise InvalidType("Contains unsupported data type")
@@ -1546,7 +1543,6 @@ pub fn DataFrame::max_horizontal(self : DataFrame) -> Series! {
   let data = Series::{
     name: "sum",
     data: SeriesData::Float(Array::make(self.shape[0], @float.min_value)),
-    data_type: DataType::Float32,
     bitmap: emptyBitMap,
     length: self.shape[0],
   }
@@ -1617,7 +1613,7 @@ pub fn DataFrame::sum(self : DataFrame) -> DataFrame!InvalidType {
 /// ```
 pub fn DataFrame::sum_horizontal(self : DataFrame) -> Series! {
   for series in self.data {
-    match series.get_type() {
+    match series.data_type() {
       DataType::Int32 => ()
       DataType::Float32 => ()
       _ => raise InvalidType("Contains unsupported data type")
@@ -1626,7 +1622,6 @@ pub fn DataFrame::sum_horizontal(self : DataFrame) -> Series! {
   let mut data = Series::{
     name: "sum",
     data: SeriesData::Float(Array::make(self.shape[0], (0.0 : Float))),
-    data_type: DataType::Float32,
     bitmap: emptyBitMap,
     length: self.shape[0],
   }
@@ -1660,7 +1655,7 @@ pub fn DataFrame::width(self : DataFrame) -> Int {
 pub fn DataFrame::schema(self : DataFrame) -> Map[String, String] {
   let schema : Map[String, String] = {}
   for series in self.data {
-    schema[series.name] = series.get_type().to_string()
+    schema[series.name] = series.data_type().to_string()
   }
   schema
 }
@@ -1698,13 +1693,13 @@ pub fn DataFrame::product(self : DataFrame) -> DataFrame {
 
 ///| Get the column data types
 pub fn DataFrame::dtypes(self : DataFrame) -> Array[String] {
-  self.data.map(fn(series) { series.get_type().to_string() })
+  self.data.map(fn(series) { series.data_type().to_string() })
 }
 
 ///|
 fn DataFrame::type_check_all(self : DataFrame, data_type : DataType) -> Bool {
   for series in self.data {
-    if series.get_type() != data_type {
+    if series.data_type() != data_type {
       return false
     }
   }
@@ -1955,10 +1950,10 @@ pub fn DataFrame::fill_null(
 ///   Series::new("B", SeriesInput::Float32([1.1, 2.2, 3.3]))
 /// ])
 /// let df_cast = df.cast!(data_type = DataType::Float32)
-/// inspect!(df_cast.data[0].data_type, content="Float32")
+/// inspect!(df_cast.data[0].get_type(), content="Float32")
 /// let df_cast = df.cast!(cast_mapping = {"A" : DataType::Float32, "B" : DataType::Int32})
-/// inspect!(df_cast.data[0].data_type, content="Float32")
-/// inspect!(df_cast.data[1].data_type, content="Int32")
+/// inspect!(df_cast.data[0].get_type(), content="Float32")
+/// inspect!(df_cast.data[1].get_type(), content="Int32")
 /// ```
 pub fn DataFrame::cast(
   self : DataFrame,
@@ -2022,7 +2017,7 @@ pub fn DataFrame::to_dict(self : DataFrame) -> Map[String, Series] {
 pub fn DataFrame::to_init_repr(self : DataFrame) -> String {
   let mut repr = "DataFrame(\n\t[\n"
   for series in self.data {
-    repr += "\t\tSeries '\{series.name}', \{series.data.to_init_repr()}, dtype=\{series.data_type},\n"
+    repr += "\t\tSeries '\{series.name}', \{series.data.to_init_repr()}, dtype=\{series.data_type()},\n"
   }
   repr += "\t]\n)"
   repr
