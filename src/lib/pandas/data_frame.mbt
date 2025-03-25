@@ -1916,11 +1916,11 @@ pub fn DataFrame::fill_null(
   strategy? : String,
   limit? : Int
 ) -> DataFrame! {
-  let series = []
+  let data = []
   for serie in self.data {
-    series.push(serie.fill_null!(value~, strategy~, limit~))
+    data.push(serie.fill_null!(value?, strategy?, limit?))
   }
-  DataFrame::{ data: series, shape: self.shape, index: self.index }
+  DataFrame::{ data, shape: self.shape, index: self.index }
 }
 
 ///| Cast DataFrame column(s) to the specified dtype(s).

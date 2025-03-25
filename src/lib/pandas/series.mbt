@@ -1629,64 +1629,38 @@ pub fn Series::slice(self : Series, start : Int, end : Int) -> Series {
 /// ```
 fn Series::fill_null(
   self : Series,
-  value? : SeriesValue?,
-  strategy? : String?,
-  limit? : Int?
+  value? : SeriesValue,
+  strategy? : String,
+  limit? : Int
 ) -> Series! {
   let serie = self.copy()
-  if serie.bitmap.optional == false {
-    return serie
-  }
-  let strategy = match strategy {
-    Some(val) => val
-    None => None
-  }
-  let value = match value {
-    Some(val) => val
-    None => None
-  }
-  if strategy != None {
-    let operate = match strategy {
-      Some(op) => op
-      None => abort("nerver happened")
-    }
+  guard serie.bitmap.optional else { serie }
+  if strategy is Some(operate) {
     // ‘forward’, ‘backward’, ‘min’, ‘max’, ‘mean’, ‘zero’, ‘one’
     // !unsafe
-    let limit : Int64 = match limit {
-      Some(val) =>
-        match val {
-          Some(v) => v.to_int64()
-          None => @int64.max_value
-        }
-      None => @int64.max_value
+    let mut rest_limit : UInt64 = match limit {
+      Some(v) => v.to_uint64()
+      None => @uint64.max_value
     }
     match operate {
-      "forward" => {
-        let mut fill_cnt : Int64 = 0
+      "forward" =>
         for i in 1..<serie.length() {
           if serie.bitmap[i] && not(serie.bitmap[i - 1]) {
-            fill_cnt += 1
-            if fill_cnt > limit {
-              break
-            }
+            guard rest_limit > 0 else { break }
+            rest_limit -= 1
             serie.data[i] = serie.data[i - 1]
             serie.bitmap[i] = false
           }
         }
-      }
-      "backward" => {
-        let mut fill_cnt : Int64 = 0
+      "backward" =>
         for i = serie.length() - 2; i >= 0; i = i - 1 {
           if serie.bitmap[i] && not(serie.bitmap[i + 1]) {
-            fill_cnt += 1
-            if fill_cnt > limit {
-              break
-            }
+            guard rest_limit > 0 else { break }
+            rest_limit -= 1
             serie.data[i] = serie.data[i + 1]
             serie.bitmap[i] = false
           }
         }
-      }
       "min" => {
         let mn = serie.min!()
         for i in 0..<serie.length() {
@@ -1707,10 +1681,10 @@ fn Series::fill_null(
         serie.data = SeriesData::Float(
           Array::makei(serie.length(), fn(i) { serie.data[i].to_float() }),
         )
-        let mean = serie.mean!()
+        let mean = SeriesValue::Float(serie.mean!())
         for i in 0..<serie.length() {
           if serie.bitmap[i] {
-            serie.data[i] = SeriesValue::Float(mean)
+            serie.data[i] = mean
           }
         }
       }
@@ -1729,11 +1703,7 @@ fn Series::fill_null(
       _ => raise InvalidType("unsupported strategy")
     }
     serie.bitmap.clear(inplace=true) |> ignore
-  } else if value != None {
-    let value = match value {
-      Some(val) => val
-      None => abort("nerver happened")
-    }
+  } else if value is Some(value) {
     guard type_check_operation(serie.data_type(), value.get_type()) else {
       raise InvalidType("Value type does not match column type")
     }
@@ -1754,39 +1724,27 @@ test "Series::fill_null" {
     SeriesInput::Int32_Nullable([Some(1), None, Some(3), None]),
   )
   inspect!(
-    series.fill_null!(value=Some(SeriesValue::Int(1))).data,
+    series.fill_null!(value=SeriesValue::Int(1)).data,
     content="Int([1, 1, 3, 1])",
   )
   inspect!(
-    series.fill_null!(strategy=Some("forward")).data,
+    series.fill_null!(strategy="forward").data,
     content="Int([1, 1, 3, 3])",
   )
   inspect!(
-    series.fill_null!(strategy=Some("backward")).data,
+    series.fill_null!(strategy="backward").data,
     content="Int([1, 3, 3, 0])",
   )
+  inspect!(series.fill_null!(strategy="min").data, content="Int([1, 1, 3, 1])")
+  inspect!(series.fill_null!(strategy="max").data, content="Int([1, 3, 3, 3])")
   inspect!(
-    series.fill_null!(strategy=Some("min")).data,
-    content="Int([1, 1, 3, 1])",
-  )
-  inspect!(
-    series.fill_null!(strategy=Some("max")).data,
-    content="Int([1, 3, 3, 3])",
-  )
-  inspect!(
-    series.fill_null!(strategy=Some("mean")).data,
+    series.fill_null!(strategy="mean").data,
     content="Float([1, 2, 3, 2])",
   )
+  inspect!(series.fill_null!(strategy="zero").data, content="Int([1, 0, 3, 0])")
+  inspect!(series.fill_null!(strategy="one").data, content="Int([1, 1, 3, 1])")
   inspect!(
-    series.fill_null!(strategy=Some("zero")).data,
-    content="Int([1, 0, 3, 0])",
-  )
-  inspect!(
-    series.fill_null!(strategy=Some("one")).data,
-    content="Int([1, 1, 3, 1])",
-  )
-  inspect!(
-    series.fill_null!(strategy=Some("forward"), limit=Some(1)).data,
+    series.fill_null!(strategy="forward", limit=1).data,
     content="Int([1, 1, 3, 0])",
   )
 }
