@@ -1886,41 +1886,37 @@ test "Series::swap" {
 ///
 /// Returns
 ///
-/// - `Option[Series]` : A new Series with null values moved to the front if `inplace` is false, otherwise None
+/// - `Series` : A new Series with null values moved to the front if `inplace` is false, otherwise self
 ///
 /// Example
 /// ```
 /// let series = Series::new("test", SeriesInput::Int32_Nullable([Some(1), None, Some(3), None]))
 /// let new_series = series.move_nulls_front()
-/// inspect!(new_series.unwrap().bitmap.bitmap, content="[true, true, false, false]")
-/// inspect!(new_series.unwrap().data, content="Int([0, 0, 1, 3])")
+/// inspect!(new_series.bitmap.bitmap, content="[true, true, false, false]")
+/// inspect!(new_series.data, content="Int([0, 0, 1, 3])")
 /// inspect!(series.data, content="Int([1, 0, 3, 0])")
 /// ```
 pub fn Series::move_nulls_front(
   self : Series,
   inplace~ : Bool = false
-) -> Series? {
-  if self.bitmap.optional == false {
-    match inplace {
-      true => return None
-      false => return Some(self.copy())
-    }
-  }
+) -> Series {
   match inplace {
     false => {
       let copy_serie = self.copy()
       copy_serie.move_nulls_front(inplace=true) |> ignore
-      return Some(copy_serie)
+      copy_serie
     }
     true => {
-      let mut j = self.length() - 1
-      for i = self.length() - 1; i >= 0; i = i - 1 {
-        if not(self.bitmap[i]) {
-          self.swap?(i, j) |> ignore
-          j -= 1
+      if self.bitmap.optional {
+        let mut j = self.length() - 1
+        for i = self.length() - 1; i >= 0; i = i - 1 {
+          if not(self.bitmap[i]) {
+            self.swap?(i, j) |> ignore
+            j -= 1
+          }
         }
       }
-      return None
+      self
     }
   }
 }
@@ -1932,11 +1928,8 @@ test "Series::move_nulls_front" {
     SeriesInput::Int32_Nullable([Some(1), None, Some(3), None]),
   )
   let new_series = series.move_nulls_front()
-  inspect!(
-    new_series.unwrap().bitmap.bitmap,
-    content="[true, true, false, false]",
-  )
-  inspect!(new_series.unwrap().data, content="Int([0, 0, 1, 3])")
+  inspect!(new_series.bitmap.bitmap, content="[true, true, false, false]")
+  inspect!(new_series.data, content="Int([0, 0, 1, 3])")
   inspect!(series.data, content="Int([1, 0, 3, 0])")
 }
 
