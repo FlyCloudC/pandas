@@ -337,7 +337,6 @@ pub fn DataFrame::drop_row(self : DataFrame, row_index : Int) -> Unit! {
   for col in self.data {
     col.data.erase!(row_index)
     col.bitmap.bitmap.remove(row_index) |> ignore
-    col.length = col.length - 1
   }
   self.shape[0] -= 1
 }
@@ -431,7 +430,6 @@ pub fn DataFrame::add_row(self : DataFrame, row : Array[SeriesValue]) -> Unit! {
         self.data[i].data.resize(self.shape[0] + 1)
       }
     }
-    self.data[i].length += 1
   }
   self.shape[0] += 1
 }
@@ -525,7 +523,6 @@ pub fn DataFrame::select_rows(
               name: col.name(),
               data: series_data,
               bitmap: col.bitmap.select_rows(i),
-              length: i.length(),
             })
           }
           DataFrame::{
@@ -555,7 +552,6 @@ pub fn op_get(self : DataFrame, index : Int) -> DataFrame {
       name: col.name,
       data: series_data,
       bitmap: col.bitmap.slice(index, length=1),
-      length: 1,
     })
   }
   DataFrame::{ data: row, shape: [1, self.shape()[1]], index: self.index }
@@ -1447,7 +1443,6 @@ pub fn DataFrame::min_horizontal(self : DataFrame) -> Series! {
     name: "sum",
     data: SeriesData::Float(Array::make(self.shape[0], @float.max_value)),
     bitmap: emptyBitMap,
-    length: self.shape[0],
   }
   for series in self.data {
     data.data.min(series.data)
@@ -1544,7 +1539,6 @@ pub fn DataFrame::max_horizontal(self : DataFrame) -> Series! {
     name: "sum",
     data: SeriesData::Float(Array::make(self.shape[0], @float.min_value)),
     bitmap: emptyBitMap,
-    length: self.shape[0],
   }
   for series in self.data {
     data.data.max(series.data)
@@ -1623,7 +1617,6 @@ pub fn DataFrame::sum_horizontal(self : DataFrame) -> Series! {
     name: "sum",
     data: SeriesData::Float(Array::make(self.shape[0], (0.0 : Float))),
     bitmap: emptyBitMap,
-    length: self.shape[0],
   }
   for series in self.data {
     data += series

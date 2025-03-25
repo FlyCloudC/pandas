@@ -11,7 +11,6 @@ pub(all) struct Series {
   mut name : String
   mut data : SeriesData
   mut bitmap : BitMap
-  mut length : Int
 } derive(Show, Eq)
 
 ///|
@@ -109,17 +108,12 @@ pub fn Series::new(name : String, values : SeriesInput) -> Series {
       )
     }
   }
-  Series::{
-    name: name.to_string(),
-    data,
-    bitmap: bit_map,
-    length: data.length(),
-  }
+  Series::{ name: name.to_string(), data, bitmap: bit_map }
 }
 
 ///| 内部保证无null时使用
 fn Series::new_by_SeriesData(name : String, data : SeriesData) -> Series {
-  Series::{ name, data, bitmap: emptyBitMap, length: data.length() }
+  Series::{ name, data, bitmap: emptyBitMap }
 }
 
 ///| Get the length of the SeriesData
@@ -134,7 +128,7 @@ fn SeriesData::length(self : SeriesData) -> Int {
 
 ///|
 pub fn Series::length(self : Series) -> Int {
-  self.length
+  self.data.length()
 }
 
 ///| SeriesData clear
@@ -169,7 +163,6 @@ pub fn Series::clear(self : Series, n~ : Int = 0) -> Series {
     name: self.name(),
     data: SeriesData::create_by_size(n, self.data_type()),
     bitmap: self.bitmap.clear(n~),
-    length: n,
   }
 }
 
@@ -226,7 +219,6 @@ pub fn Series::erase(self : Series, index : Int) -> Unit! {
     raise IndexOutOfBounds("Index out of bounds")
   }
   self.data.erase!(index)
-  self.length -= 1
   // compute bitmap
   self.bitmap.erase(index)
 }
@@ -320,8 +312,8 @@ pub fn Series::sort(self : Series) -> Unit {
     true => {
       // 没有自定义排序
       let mut l = 0
-      for i in 0..<self.length {
-        while l < self.length && self.bitmap[l] {
+      for i in 0..<self.length() {
+        while l < self.length() && self.bitmap[l] {
           l += 1
         }
         if self.bitmap[i] && i > l {
@@ -408,8 +400,8 @@ pub fn Series::get_argsort_indices(
       }
       match (descending, nulls_last) {
         (false, false) | (true, true) => {
-          let mut r = self.length - 1
-          for i = self.length - 1; i >= 0; i = i - 1 {
+          let mut r = self.length() - 1
+          for i = self.length() - 1; i >= 0; i = i - 1 {
             if not(self.bitmap[indices[i]]) {
               indices.swap(i, r)
               r -= 1
@@ -418,7 +410,7 @@ pub fn Series::get_argsort_indices(
         }
         (true, false) | (false, true) => {
           let mut l = 0
-          for i in 0..<self.length {
+          for i in 0..<self.length() {
             if not(self.bitmap[indices[i]]) {
               indices.swap(i, l)
               l += 1
@@ -562,7 +554,6 @@ pub fn Series::op_add(self : Series, other : Series) -> Series {
     name: self.name(),
     data: self.data() + other.data(),
     bitmap: self.bitmap + other.bitmap,
-    length: self.length(),
   }
 }
 
@@ -605,7 +596,6 @@ pub fn Series::op_sub(self : Series, other : Series) -> Series {
     name: self.name(),
     data: self.data() - other.data(),
     bitmap: self.bitmap + other.bitmap,
-    length: self.length(),
   }
 }
 
@@ -638,7 +628,6 @@ pub fn Series::op_mul(self : Series, other : Series) -> Series {
     name: self.name(),
     data: self.data() * other.data(),
     bitmap: self.bitmap + other.bitmap,
-    length: self.length(),
   }
 }
 
@@ -671,7 +660,6 @@ pub fn Series::op_div(self : Series, other : Series) -> Series {
     name: self.name(),
     data: self.data() / other.data(),
     bitmap: self.bitmap + other.bitmap,
-    length: self.length(),
   }
 }
 
@@ -721,12 +709,10 @@ pub fn merge(
         name: self.name(),
         data,
         bitmap: BitMap::merge(self.bitmap, other.bitmap, inplace=false),
-        length: self.length() + other.length(),
       }
     true => {
       self.data = data
       self.bitmap = BitMap::merge(self.bitmap, other.bitmap, inplace=true)
-      self.length += other.length()
       self
     }
   }
@@ -758,7 +744,6 @@ pub fn Series::copy(self : Series) -> Series {
     name: self.name(),
     data: self.data.copy(),
     bitmap: self.bitmap.copy(),
-    length: self.length(),
   }
 }
 
@@ -1101,7 +1086,7 @@ pub fn Series::var(self : Series, ddof~ : Int = 1) -> Float! {
 
 ///|
 pub fn Series::count(self : Series) -> Int {
-  self.length
+  self.length()
 }
 
 ///|
@@ -1314,7 +1299,7 @@ fn SeriesData::resize(self : SeriesData, new_length : Int) -> Unit {
 
 ///| Check if the Series is empty.
 pub fn Series::is_empty(self : Series) -> Bool {
-  self.length == 0
+  self.length() == 0
 }
 
 ///| Returns a boolean Series indicating which values are null
@@ -1335,9 +1320,9 @@ pub fn Series::is_empty(self : Series) -> Bool {
 pub fn Series::is_null(self : Series) -> Series {
   let data = match self.bitmap.optional {
     true => SeriesData::Bool(self.bitmap.bitmap)
-    false => SeriesData::Bool(Array::make(self.length, false))
+    false => SeriesData::Bool(Array::make(self.length(), false))
   }
-  Series::{ name: self.name(), data, bitmap: emptyBitMap, length: self.length }
+  Series::{ name: self.name(), data, bitmap: emptyBitMap }
 }
 
 ///| Returns a boolean Series indicating which values are not null
@@ -1358,9 +1343,9 @@ pub fn Series::is_null(self : Series) -> Series {
 pub fn Series::is_not_null(self : Series) -> Series {
   let data = match self.bitmap.optional {
     true => SeriesData::Bool(self.bitmap.bitmap.map(fn(x) { not(x) }))
-    false => SeriesData::Bool(Array::make(self.length, true))
+    false => SeriesData::Bool(Array::make(self.length(), true))
   }
-  Series::{ name: self.name(), data, bitmap: emptyBitMap, length: self.length }
+  Series::{ name: self.name(), data, bitmap: emptyBitMap }
 }
 
 ///| Check if the Series is sorted
@@ -1394,11 +1379,11 @@ pub fn Series::is_sorted(
   nulls_last~ : Bool = false
 ) -> Bool {
   let mut l = 0
-  let mut r = self.length - 1
+  let mut r = self.length() - 1
   // check nulls
   match nulls_last {
     false =>
-      while l < self.length && self.bitmap[l] {
+      while l < self.length() && self.bitmap[l] {
         l += 1
       }
     true =>
@@ -1458,7 +1443,7 @@ pub fn Series::null_count(self : Series) -> Int {
 /// ```
 pub fn Series::n_unique(self : Series) -> Int {
   let st = @hashset.new()
-  for i in 0..<self.length {
+  for i in 0..<self.length() {
     if not(self.bitmap[i]) {
       st.add(self.data[i])
     }
@@ -1511,7 +1496,7 @@ pub fn Series::upper_bound(self : Series) -> Series {
 pub fn Series::unique_counts(self : Series) -> Series {
   let count : @hashmap.T[SeriesValue, Int] = @hashmap.new()
   let order : Array[SeriesValue] = Array::new()
-  for i in 0..<self.length {
+  for i in 0..<self.length() {
     if not(count.contains(self.data[i])) {
       order.push(self.data[i])
     }
@@ -1561,12 +1546,7 @@ pub fn Series::append(self : Series, other : Series) -> Series!InvalidType {
     (SeriesData::Str(a), SeriesData::Str(b)) => SeriesData::Str(a + b)
     _ => raise InvalidType("append must be the same type")
   }
-  Series::{
-    name: self.name(),
-    data,
-    bitmap: self.bitmap.append(other.bitmap),
-    length: self.length + other.length,
-  }
+  Series::{ name: self.name(), data, bitmap: self.bitmap.append(other.bitmap) }
 }
 
 ///| Extend the current Series with another Series
@@ -1593,7 +1573,6 @@ pub fn Series::extend(self : Series, other : Series) -> Unit!InvalidType {
   }
   self.data = self.data.append(other.data)
   self.bitmap = self.bitmap.append(other.bitmap)
-  self.length += other.length
 }
 
 ///| Concatenate multiple Series into one
@@ -1632,13 +1611,11 @@ pub fn Series::concat(data : Array[Series]) -> Series! {
   }
   let mut new_data = emptySeriesData(data[0].data_type())
   let mut bitmap = emptyBitMap
-  let mut length = 0
   for item in data {
     new_data = new_data.append(item.data)
     bitmap = bitmap + item.bitmap
-    length += item.length
   }
-  Series::{ name: data[0].name(), data: new_data, bitmap, length }
+  Series::{ name: data[0].name(), data: new_data, bitmap }
 }
 
 ///| Slice the Series from start to end
@@ -1664,7 +1641,7 @@ pub fn Series::slice(self : Series, start : Int, end : Int) -> Series {
     true => self.bitmap.slice(start, length=end - start)
     false => emptyBitMap
   }
-  Series::{ name: self.name(), data, bitmap, length: end - start }
+  Series::{ name: self.name(), data, bitmap }
 }
 
 ///| Fill null values in the Series using the specified value or strategy ( call by DataFrame::fill_null )
@@ -1725,7 +1702,7 @@ fn Series::fill_null(
     match operate {
       "forward" => {
         let mut fill_cnt : Int64 = 0
-        for i in 1..<serie.length {
+        for i in 1..<serie.length() {
           if serie.bitmap[i] && not(serie.bitmap[i - 1]) {
             fill_cnt += 1
             if fill_cnt > limit {
@@ -1738,7 +1715,7 @@ fn Series::fill_null(
       }
       "backward" => {
         let mut fill_cnt : Int64 = 0
-        for i = serie.length - 2; i >= 0; i = i - 1 {
+        for i = serie.length() - 2; i >= 0; i = i - 1 {
           if serie.bitmap[i] && not(serie.bitmap[i + 1]) {
             fill_cnt += 1
             if fill_cnt > limit {
@@ -1751,7 +1728,7 @@ fn Series::fill_null(
       }
       "min" => {
         let mn = serie.min!()
-        for i in 0..<serie.length {
+        for i in 0..<serie.length() {
           if serie.bitmap[i] {
             serie.data[i] = mn
           }
@@ -1759,7 +1736,7 @@ fn Series::fill_null(
       }
       "max" => {
         let mx = serie.max!()
-        for i in 0..<serie.length {
+        for i in 0..<serie.length() {
           if serie.bitmap[i] {
             serie.data[i] = mx
           }
@@ -1767,23 +1744,23 @@ fn Series::fill_null(
       }
       "mean" => {
         serie.data = SeriesData::Float(
-          Array::makei(serie.length, fn(i) { serie.data[i].to_float() }),
+          Array::makei(serie.length(), fn(i) { serie.data[i].to_float() }),
         )
         let mean = serie.mean!()
-        for i in 0..<serie.length {
+        for i in 0..<serie.length() {
           if serie.bitmap[i] {
             serie.data[i] = SeriesValue::Float(mean)
           }
         }
       }
       "zero" =>
-        for i in 0..<serie.length {
+        for i in 0..<serie.length() {
           if serie.bitmap[i] {
             serie.data[i] = SeriesValue::Int(0)
           }
         }
       "one" =>
-        for i in 0..<serie.length {
+        for i in 0..<serie.length() {
           if serie.bitmap[i] {
             serie.data[i] = SeriesValue::Int(1)
           }
@@ -1799,7 +1776,7 @@ fn Series::fill_null(
     guard type_check_operation(serie.data_type(), value.get_type()) else {
       raise InvalidType("Value type does not match column type")
     }
-    for i in 0..<serie.length {
+    for i in 0..<serie.length() {
       if serie.bitmap[i] {
         serie.data[i] = value
       }
@@ -1932,10 +1909,10 @@ fn Series::cast(
     strict == false &&
     self.data_type() == DataType::String &&
     (dtype == DataType::Int32 || dtype == DataType::Float32) {
-    true => BitMap::new_by_size(self.length, value=true)
+    true => BitMap::new_by_size(self.length(), value=true)
     false => self.bitmap
   }
-  Series::{ name: self.name(), data, bitmap, length: self.length }
+  Series::{ name: self.name(), data, bitmap }
 }
 
 ///|
@@ -1967,7 +1944,7 @@ fn SeriesData::to_init_repr(self : SeriesData) -> String {
 /// inspect!(series.data.to_string(), content="Int([2, 1, 3])")
 /// ```
 pub fn Series::swap(self : Series, x : Int, y : Int) -> Unit!IndexOutOfBounds {
-  guard x >= 0 && x < self.length && y >= 0 && y < self.length else {
+  guard x >= 0 && x < self.length() && y >= 0 && y < self.length() else {
     raise IndexOutOfBounds("Index out of bounds")
   }
   let tmp = self.data[x]
@@ -2023,8 +2000,8 @@ pub fn Series::move_nulls_front(
       return Some(copy_serie)
     }
     true => {
-      let mut j = self.length - 1
-      for i = self.length - 1; i >= 0; i = i - 1 {
+      let mut j = self.length() - 1
+      for i = self.length() - 1; i >= 0; i = i - 1 {
         if not(self.bitmap[i]) {
           self.swap?(i, j) |> ignore
           j -= 1
@@ -2087,7 +2064,7 @@ pub fn Series::move_nulls_back(
     }
     true => {
       let mut j = 0
-      for i in 0..<self.length {
+      for i in 0..<self.length() {
         if not(self.bitmap[i]) {
           self.swap?(i, j) |> ignore
           j += 1
