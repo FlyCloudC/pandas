@@ -77,6 +77,7 @@ fn BitMap::append(self : BitMap, other : BitMap) -> BitMap {
   }
 }
 
+///|
 test "BitMap::op_add" {
   let a = BitMap::new(data=[Some(1), None, Some(3)])
   let b = BitMap::new(data=[None, Some(2), Some(3)])
@@ -208,6 +209,7 @@ fn BitMap::select_rows(self : BitMap, rows : Array[Int]) -> BitMap {
   }
 }
 
+///|
 test "BitMap::select_rows" {
   let a = BitMap::new(data=[Some(1), None, Some(3)])
   let b = a.select_rows([0, 1])
@@ -270,6 +272,7 @@ fn BitMap::merge(
   }
 }
 
+///|
 test "BitMap::merge" {
   let a = BitMap::new(data=[Some(1), None, Some(3)])
   let b = BitMap::new(data=[Some(1), Some(2), Some(3)])

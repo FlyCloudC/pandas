@@ -16,6 +16,7 @@ fn indices_sort[T](data : Array[T], indices : Array[Int]) -> Unit {
   }
 }
 
+///|
 test "indices_sort" {
   let arr = [3, 2, 1]
   let indices = [2, 1, 0]

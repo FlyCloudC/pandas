@@ -766,6 +766,7 @@ pub fn hstack(
   }
 }
 
+///|
 test "DataFrame::hstack" {
   let df1 = DataFrame::new!([Series::new("A", SeriesInput::Int32([1, 2, 3]))])
   let df2 = DataFrame::new!([Series::new("B", SeriesInput::Int32([4, 5, 6]))])
@@ -1394,7 +1395,7 @@ pub fn DataFrame::min(self : DataFrame) -> DataFrame! {
         data.push(
           Series::new_by_SeriesData(series.name, SeriesData::Str([value])),
         )
-      SeriesValue::Null => {
+      SeriesValue::Null =>
         match series.get_type() {
           DataType::Int32 =>
             data.push(
@@ -1413,7 +1414,6 @@ pub fn DataFrame::min(self : DataFrame) -> DataFrame! {
               Series::new(series.name, SeriesInput::Str_Nullable([None])),
             )
         }
-      }
     }
   }
   DataFrame::{ data, shape: [1, self.shape[1]], index: self.index }
@@ -1493,7 +1493,7 @@ pub fn DataFrame::max(self : DataFrame) -> DataFrame! {
         data.push(
           Series::new_by_SeriesData(series.name, SeriesData::Str([value])),
         )
-      SeriesValue::Null => {
+      SeriesValue::Null =>
         match series.get_type() {
           DataType::Int32 =>
             data.push(
@@ -1512,7 +1512,6 @@ pub fn DataFrame::max(self : DataFrame) -> DataFrame! {
               Series::new(series.name, SeriesInput::Str_Nullable([None])),
             )
         }
-      }
     }
   }
   DataFrame::{ data, shape: [1, self.shape[1]], index: self.index }
@@ -2029,6 +2028,7 @@ pub fn DataFrame::to_init_repr(self : DataFrame) -> String {
   repr
 }
 
+///|
 test "DataFrame::to_init_repr" {
   let df = DataFrame::new!([
     Series::new("A", SeriesInput::Int32([1, 2, 3])),
@@ -2124,6 +2124,7 @@ pub fn DataFrame::drop_nulls(
   self.select_rows!(indices=rows)
 }
 
+///|
 test "DataFrame::drop_nulls" {
   let df = DataFrame::new!([
     Series::new("A", SeriesInput::Int32_Nullable([Some(1), None, Some(3)])),
@@ -2168,6 +2169,7 @@ pub fn DataFrame::gather_every(
   self.select_rows?(indices=rows).unwrap()
 }
 
+///|
 test "DataFrame::gather_every" {
   let df = DataFrame::new!([
     Series::new("A", SeriesInput::Int32([1, 2, 3, 4, 5, 6, 7, 8, 9, 10])),
@@ -2203,21 +2205,22 @@ test "DataFrame::gather_every" {
 /// inspect!(serie.data, content="Int([1, 2, 3])")
 /// inspect!(df.shape, content="[3, 1]")
 /// ```
-pub fn DataFrame::drop_in_place(self: DataFrame, name : String) -> Series! {
-    guard self.index.contains(name) else {
-        raise ColumnNotFoundError("Column \{name} not found")
-    }
-    let serie_droped = self.data[self.get_column_index?(name).unwrap()]
-    self.drop_column!(name)
-    serie_droped
+pub fn DataFrame::drop_in_place(self : DataFrame, name : String) -> Series! {
+  guard self.index.contains(name) else {
+    raise ColumnNotFoundError("Column \{name} not found")
+  }
+  let serie_droped = self.data[self.get_column_index?(name).unwrap()]
+  self.drop_column!(name)
+  serie_droped
 }
 
+///|
 test "DataFrame::drop_in_place" {
-    let df = DataFrame::new!([
-        Series::new("A", SeriesInput::Int32([1, 2, 3])),
-        Series::new("B", SeriesInput::Int32([4, 5, 6])),
-    ])
-    let serie = df.drop_in_place!("A")
-    inspect!(serie.data, content="Int([1, 2, 3])")
-    inspect!(df.shape, content="[3, 1]")
+  let df = DataFrame::new!([
+    Series::new("A", SeriesInput::Int32([1, 2, 3])),
+    Series::new("B", SeriesInput::Int32([4, 5, 6])),
+  ])
+  let serie = df.drop_in_place!("A")
+  inspect!(serie.data, content="Int([1, 2, 3])")
+  inspect!(df.shape, content="[3, 1]")
 }
